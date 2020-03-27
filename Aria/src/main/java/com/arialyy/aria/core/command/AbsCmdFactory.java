@@ -15,18 +15,18 @@
  */
 package com.arialyy.aria.core.command;
 
-import com.arialyy.aria.core.inf.AbsTaskEntity;
+import com.arialyy.aria.core.task.ITask;
+import com.arialyy.aria.core.wrapper.AbsTaskWrapper;
 
 /**
  * Created by AriaL on 2017/6/29.
  * 抽象命令工厂
  */
-public abstract class AbsCmdFactory<TASK_ENTITY extends AbsTaskEntity, CMD extends AbsCmd> {
+public abstract class AbsCmdFactory<TASK_ENTITY extends AbsTaskWrapper, CMD extends AbsCmd> {
 
   /**
    * @param entity 下载实体
-   * @param taskType {@link ICmd#TASK_TYPE_DOWNLOAD}、{@link ICmd#TASK_TYPE_DOWNLOAD_GROUP}、{@link
-   * ICmd#TASK_TYPE_UPLOAD}
+   * {@link ITask#DOWNLOAD}、{@link ITask#DOWNLOAD_GROUP}、{@link ITask#UPLOAD}
    */
   public abstract CMD createCmd(TASK_ENTITY entity, int type, int taskType);
 }

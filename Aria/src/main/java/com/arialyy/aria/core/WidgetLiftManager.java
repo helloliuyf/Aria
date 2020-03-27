@@ -20,7 +20,6 @@ import android.app.Dialog;
 import android.content.DialogInterface;
 import android.os.Build;
 import android.os.Message;
-import android.support.v4.app.DialogFragment;
 import android.widget.PopupWindow;
 import com.arialyy.aria.util.ALog;
 import com.arialyy.aria.util.CommonUtil;
@@ -35,22 +34,9 @@ final class WidgetLiftManager {
 
   /**
    * 处理DialogFragment事件
-   *
-   * @param dialogFragment {@link android.app.DialogFragment}
    */
-  @TargetApi(Build.VERSION_CODES.HONEYCOMB) boolean handleDialogFragmentLift(
-      android.app.DialogFragment dialogFragment) {
-    return handleDialogLift(dialogFragment.getDialog());
-  }
-
-  /**
-   * 处理DialogFragment事件
-   *
-   * @param dialogFragment {@link android.support.v4.app.DialogFragment}
-   */
-  @TargetApi(Build.VERSION_CODES.HONEYCOMB) boolean handleDialogFragmentLift(
-      DialogFragment dialogFragment) {
-    return handleDialogLift(dialogFragment.getDialog());
+  @TargetApi(Build.VERSION_CODES.HONEYCOMB) boolean handleDialogFragmentLift(Dialog dialog) {
+    return handleDialogLift(dialog);
   }
 
   /**
@@ -80,15 +66,23 @@ final class WidgetLiftManager {
   private PopupWindow.OnDismissListener createPopupWindowListener(final PopupWindow popupWindow) {
     return new PopupWindow.OnDismissListener() {
       @Override public void onDismiss() {
-        AriaManager.getInstance(AriaManager.APP).removeReceiver(popupWindow);
+        AriaManager.getInstance().removeReceiver(popupWindow);
       }
     };
   }
 
   /**
    * 处理对话框取消或dismiss
+   *
+   * @return true 设置了dialog的销毁事件。false 没有设置dialog的销毁事件
    */
   boolean handleDialogLift(Dialog dialog) {
+    if (dialog == null) {
+      ALog.w(TAG,
+          "dialog 为空，没有设置自动销毁事件，为了防止内存泄露，请在dismiss方法中调用Aria.download(this).unRegister();来注销事件\n"
+              + "如果你使用的是DialogFragment，那么你需要在onDestroy()中进行销毁Aria事件操作");
+      return false;
+    }
     try {
       Field dismissField = CommonUtil.getField(dialog.getClass(), "mDismissMessage");
       Message dismissMsg = (Message) dismissField.get(dialog);
@@ -120,7 +114,7 @@ final class WidgetLiftManager {
     return new Dialog.OnCancelListener() {
 
       @Override public void onCancel(DialogInterface dialog) {
-        AriaManager.getInstance(AriaManager.APP).removeReceiver(dialog);
+        AriaManager.getInstance().removeReceiver(dialog);
       }
     };
   }
@@ -132,7 +126,7 @@ final class WidgetLiftManager {
     return new Dialog.OnDismissListener() {
 
       @Override public void onDismiss(DialogInterface dialog) {
-        AriaManager.getInstance(AriaManager.APP).removeReceiver(dialog);
+        AriaManager.getInstance().removeReceiver(dialog);
       }
     };
   }

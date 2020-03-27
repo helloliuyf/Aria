@@ -15,3 +15,5 @@
 /cache
 *.log
 uml
+*.swp
+py/.history

@@ -15,13 +15,14 @@
  */
 package com.arialyy.compiler;
 
+import com.arialyy.annotations.TaskEnum;
 import java.lang.annotation.Annotation;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Created by Aria.Lao on 2017/6/7.
+ * Created by lyy on 2017/6/7.
  * 代理类参数
  */
 class ProxyClassParam {
@@ -44,9 +45,9 @@ class ProxyClassParam {
   /**
    * 子任务泛型参数
    */
-  TaskEnum subTaskEnum = TaskEnum.NORMAL_ENTITY;
+  EntityInfo subTaskEnum = EntityInfo.NORMAL;
 
   Set<TaskEnum> taskEnums;
   Map<String, Set<String>> keyMappings = new HashMap<>();
-  Map<TaskEnum, Map<Class<? extends Annotation>, String>> methods = new HashMap<>();
+  Map<TaskEnum, Map<Class<? extends Annotation>, MethodInfo>> methods = new HashMap<>();
 }

@@ -16,48 +16,109 @@
 
 package com.arialyy.aria.core.queue;
 
-import com.arialyy.aria.core.inf.AbsTask;
-import com.arialyy.aria.core.inf.AbsTaskEntity;
+import android.text.TextUtils;
+import com.arialyy.aria.core.common.AbsEntity;
 import com.arialyy.aria.core.inf.IEntity;
+import com.arialyy.aria.core.inf.TaskSchedulerType;
+import com.arialyy.aria.core.manager.TaskWrapperManager;
+import com.arialyy.aria.core.manager.ThreadTaskManager;
 import com.arialyy.aria.core.queue.pool.BaseCachePool;
 import com.arialyy.aria.core.queue.pool.BaseExecutePool;
+import com.arialyy.aria.core.queue.pool.DGLoadSharePool;
+import com.arialyy.aria.core.queue.pool.DLoadSharePool;
+import com.arialyy.aria.core.queue.pool.UploadSharePool;
+import com.arialyy.aria.core.task.AbsTask;
+import com.arialyy.aria.core.task.DownloadGroupTask;
+import com.arialyy.aria.core.task.DownloadTask;
+import com.arialyy.aria.core.task.UploadTask;
+import com.arialyy.aria.core.wrapper.AbsTaskWrapper;
 import com.arialyy.aria.util.ALog;
-import java.util.Map;
-import java.util.Set;
+import com.arialyy.aria.util.CommonUtil;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Created by lyy on 2017/2/23.
- * 任务队列
+ * Created by lyy on 2017/2/23. 任务队列
  */
-abstract class AbsTaskQueue<TASK extends AbsTask, TASK_ENTITY extends AbsTaskEntity>
-    implements ITaskQueue<TASK, TASK_ENTITY> {
-  private final String TAG = "AbsTaskQueue";
+public abstract class AbsTaskQueue<TASK extends AbsTask, TASK_WRAPPER extends AbsTaskWrapper>
+    implements ITaskQueue<TASK, TASK_WRAPPER> {
+  final int TYPE_D_QUEUE = 1;
+  final int TYPE_DG_QUEUE = 2;
+  final int TYPE_U_QUEUE = 3;
+
+  private final String TAG = CommonUtil.getClassName(this);
   BaseCachePool<TASK> mCachePool;
   BaseExecutePool<TASK> mExecutePool;
 
   AbsTaskQueue() {
-    mCachePool = setCachePool();
-    mExecutePool = setExecutePool();
+    switch (getQueueType()) {
+      case TYPE_D_QUEUE:
+        mCachePool = DLoadSharePool.getInstance().cachePool;
+        mExecutePool = DLoadSharePool.getInstance().executePool;
+        break;
+      case TYPE_DG_QUEUE:
+        mCachePool = DGLoadSharePool.getInstance().cachePool;
+        mExecutePool = DGLoadSharePool.getInstance().executePool;
+        break;
+      case TYPE_U_QUEUE:
+        mCachePool = UploadSharePool.getInstance().cachePool;
+        mExecutePool = UploadSharePool.getInstance().executePool;
+        break;
+    }
   }
 
-  abstract BaseCachePool<TASK> setCachePool();
+  abstract int getQueueType();
 
-  abstract BaseExecutePool<TASK> setExecutePool();
+  /**
+   * 获取执行中的任务
+   *
+   * @return 没有执行中的任务，返回null
+   */
+  public <T extends AbsEntity> List<T> getRunningTask(Class<T> type) {
+    List<TASK> exeTask = mExecutePool.getAllTask();
+    List<TASK> cacheTask = mCachePool.getAllTask();
+    List<T> entities = new ArrayList<>();
+    if (exeTask != null && !exeTask.isEmpty()) {
+      for (TASK task : exeTask) {
+        entities.add((T) task.getTaskWrapper().getEntity());
+      }
+    }
+    if (cacheTask != null && !cacheTask.isEmpty()) {
+      for (TASK task : cacheTask) {
+        entities.add((T) task.getTaskWrapper().getEntity());
+      }
+    }
+    return entities.isEmpty() ? null : entities;
+  }
 
   @Override public boolean taskIsRunning(String key) {
-    return mExecutePool.getTask(key) != null;
+    if (TextUtils.isEmpty(key)) {
+      ALog.w(TAG, "key为空，无法确认任务是否执行");
+      return false;
+    }
+    TASK task = mExecutePool.getTask(key);
+    if (task == null && ThreadTaskManager.getInstance().taskIsRunning(key)) {
+      ThreadTaskManager.getInstance().removeTaskThread(key);
+    }
+    return task != null && task.isRunning() && taskExists(key);
   }
 
   /**
-   * 恢复任务
-   * 如果执行队列任务未满，则直接启动任务。
-   * 如果执行队列已经满了，则暂停执行队列队首任务，并恢复指定任务
+   * 恢复任务 如果执行队列任务未满，则直接启动任务。 如果执行队列已经满了，则暂停执行队列队首任务，并恢复指定任务
    *
    * @param task 需要恢复的任务
    */
   @Override public void resumeTask(TASK task) {
+    if (task == null) {
+      ALog.w(TAG, "resume task fail, task is null");
+      return;
+    }
+    if (mExecutePool.taskExits(task.getKey())) {
+      ALog.w(TAG, String.format("task【%s】running", task.getKey()));
+      return;
+    }
     if (mExecutePool.size() >= getMaxTaskNum()) {
-      task.getTaskEntity().getEntity().setState(IEntity.STATE_WAIT);
+      task.getTaskWrapper().getEntity().setState(IEntity.STATE_WAIT);
       mCachePool.putTaskToFirst(task);
       stopTask(mExecutePool.pollTask());
     } else {
@@ -69,35 +130,35 @@ abstract class AbsTaskQueue<TASK extends AbsTask, TASK_ENTITY extends AbsTaskEnt
    * 停止所有任务
    */
   @Override public void stopAllTask() {
-    mCachePool.clear();
-    for (String key : mExecutePool.getAllTask().keySet()) {
-      TASK task = mExecutePool.getAllTask().get(key);
+    for (TASK task : mExecutePool.getAllTask()) {
       if (task != null) {
         int state = task.getState();
         if (task.isRunning() || (state != IEntity.STATE_COMPLETE
             && state != IEntity.STATE_CANCEL)) {
-          task.stop();
+          task.stop(TaskSchedulerType.TYPE_STOP_NOT_NEXT);
         }
       }
     }
-  }
 
-  /**
-   * 最大下载速度
-   */
-  public void setMaxSpeed(int maxSpeed) {
-    Map<String, TASK> tasks = mExecutePool.getAllTask();
-    Set<String> keys = tasks.keySet();
-    for (String key : keys) {
-      TASK task = tasks.get(key);
-      task.setMaxSpeed(maxSpeed);
+    //for (String key : mCachePool.getAllTask().keySet()) {
+    //  TASK task = mCachePool.getAllTask().get(key);
+    //  if (task != null) {
+    //    task.stop(TaskSchedulerType.TYPE_STOP_NOT_NEXT);
+    //  }
+    //}
+    for (TASK task : mCachePool.getAllTask()) {
+      if (task != null) {
+        task.stop(TaskSchedulerType.TYPE_STOP_NOT_NEXT);
+      }
     }
+    ThreadTaskManager.getInstance().removeAllThreadTask();
+    mCachePool.clear();
   }
 
   /**
-   * 获取配置文件配置的最大可执行任务数
+   * 获取配置文件旧的最大任务数
    */
-  public abstract int getConfigMaxNum();
+  public abstract int getOldMaxNum();
 
   /**
    * 获取任务执行池
@@ -131,10 +192,10 @@ abstract class AbsTaskQueue<TASK extends AbsTask, TASK_ENTITY extends AbsTaskEnt
     return mExecutePool.size();
   }
 
-  @Override public void setMaxTaskNum(int downloadNum) {
-    int oldMaxSize = getConfigMaxNum();
-    int diff = downloadNum - oldMaxSize;
-    if (oldMaxSize == downloadNum) {
+  @Override public void setMaxTaskNum(int maxNum) {
+    int oldMaxSize = getOldMaxNum();
+    int diff = maxNum - oldMaxSize;
+    if (oldMaxSize == maxNum) {
       ALog.w(TAG, "设置的下载任务数和配置文件的下载任务数一直，跳过");
       return;
     }
@@ -147,7 +208,7 @@ abstract class AbsTaskQueue<TASK extends AbsTask, TASK_ENTITY extends AbsTaskEnt
         }
       }
     }
-    mExecutePool.setMaxNum(downloadNum);
+    mExecutePool.setMaxNum(maxNum);
     if (diff >= 1) {
       for (int i = 0; i < diff; i++) {
         TASK nextTask = getNextTask();
@@ -158,6 +219,15 @@ abstract class AbsTaskQueue<TASK extends AbsTask, TASK_ENTITY extends AbsTaskEnt
     }
   }
 
+  @Override public TASK createTask(TASK_WRAPPER wrapper) {
+    TaskWrapperManager.getInstance().putTaskWrapper(wrapper);
+    return null;
+  }
+
+  @Override public boolean taskExists(String key) {
+    return getTask(key) != null;
+  }
+
   @Override public TASK getTask(String key) {
     TASK task = mExecutePool.getTask(key);
     if (task == null) {
@@ -166,23 +236,78 @@ abstract class AbsTaskQueue<TASK extends AbsTask, TASK_ENTITY extends AbsTaskEnt
     return task;
   }
 
-  @Override public void startTask(TASK task) {
-    if (mExecutePool.putTask(task)) {
-      mCachePool.removeTask(task);
-      task.getTaskEntity().getEntity().setFailNum(0);
-      task.start();
+  /**
+   * 添加等待中的任务
+   *
+   * @param task {@link DownloadTask}、{@link UploadTask}、{@link DownloadGroupTask}
+   */
+  void addTask(TASK task) {
+    if (task == null) {
+      ALog.w(TAG, "add task fail, task is null");
+      return;
+    }
+    if (!mCachePool.taskExits(task.getKey())) {
+      mCachePool.putTask(task);
     }
   }
 
-  @Override public void stopTask(TASK task) {
-    if (!task.isRunning()) {
-      ALog.w(TAG, String.format("停止任务【%s】失败，原因：已停止", task.getTaskName()));
+  @Override public void startTask(TASK task) {
+    startTask(task, TaskSchedulerType.TYPE_DEFAULT);
+  }
+
+  @Override public void startTask(TASK task, int action) {
+    if (task == null) {
+      ALog.w(TAG, "create fail, task is null");
     }
-    if (mExecutePool.removeTask(task)) {
+    if (mExecutePool.taskExits(task.getKey())) {
+      ALog.w(TAG, String.format("任务【%s】执行中", task.getKey()));
+      return;
+    }
+    mCachePool.removeTask(task);
+    mExecutePool.putTask(task);
+    task.getTaskWrapper().getEntity().setFailNum(0);
+    task.start(action);
+  }
+
+  @Override public void stopTask(TASK task) {
+    if (task == null) {
+      ALog.w(TAG, "stop fail, task is null");
+      return;
+    }
+    int state = task.getState();
+    boolean canStop = false;
+    switch (state) {
+      case IEntity.STATE_WAIT:
+        mCachePool.removeTask(task);
+        canStop = true;
+        break;
+      case IEntity.STATE_POST_PRE:
+      case IEntity.STATE_PRE:
+      case IEntity.STATE_RUNNING:
+        mExecutePool.removeTask(task);
+        canStop = true;
+        break;
+      case IEntity.STATE_STOP:
+      case IEntity.STATE_OTHER:
+      case IEntity.STATE_FAIL:
+        ALog.w(TAG, String.format("停止任务【%s】失败，原因：已停止", task.getTaskName()));
+        if (taskIsRunning(task.getKey())) {
+          removeTaskFormQueue(task.getKey());
+          if (ThreadTaskManager.getInstance().taskIsRunning(task.getKey())) {
+            ThreadTaskManager.getInstance().removeTaskThread(task.getKey());
+          }
+        }
+        break;
+      case IEntity.STATE_CANCEL:
+        ALog.w(TAG, String.format("停止任务【%s】失败，原因：任务已删除", task.getTaskName()));
+        break;
+      case IEntity.STATE_COMPLETE:
+        ALog.w(TAG, String.format("停止任务【%s】失败，原因：已完成", task.getTaskName()));
+        break;
+    }
+
+    if (canStop) {
       task.stop();
-    } else {
-      task.stop();
-      ALog.w(TAG, String.format("删除任务【%s】失败，原因：执行队列中没有该任务", task.getTaskName()));
     }
   }
 
@@ -201,19 +326,40 @@ abstract class AbsTaskQueue<TASK extends AbsTask, TASK_ENTITY extends AbsTaskEnt
 
   @Override public void reTryStart(TASK task) {
     if (task == null) {
-      ALog.e(TAG, "任务重试失败，原因：task 为null");
+      ALog.e(TAG, "reTry fail, task is null");
       return;
     }
-    if (!task.isRunning()) {
-      task.start();
-    } else {
-      task.stop();
-      ALog.e(TAG, String.format("任务【%s】重试失败，原因：任务没有完全停止", task.getTaskName()));
+
+    int state = task.getState();
+    switch (state) {
+      case IEntity.STATE_POST_PRE:
+      case IEntity.STATE_PRE:
+      case IEntity.STATE_RUNNING:
+        ALog.w(TAG, String.format("任务【%s】没有停止，即将重新下载", task.getTaskName()));
+        task.stop(TaskSchedulerType.TYPE_STOP_NOT_NEXT);
+        task.start();
+        break;
+      case IEntity.STATE_WAIT:
+      case IEntity.STATE_STOP:
+      case IEntity.STATE_OTHER:
+      case IEntity.STATE_FAIL:
+        task.start();
+        break;
+      case IEntity.STATE_CANCEL:
+        ALog.e(TAG, String.format("任务【%s】重试失败，原因：任务已删除", task.getTaskName()));
+        break;
+      case IEntity.STATE_COMPLETE:
+        ALog.e(TAG, String.format("任务【%s】重试失败，原因：已完成", task.getTaskName()));
+        break;
     }
   }
 
   @Override public void cancelTask(TASK task) {
-    task.cancel();
+    cancelTask(task, TaskSchedulerType.TYPE_DEFAULT);
+  }
+
+  @Override public void cancelTask(TASK task, int action) {
+    task.cancel(action);
   }
 
   @Override public TASK getNextTask() {

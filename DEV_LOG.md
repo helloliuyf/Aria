@@ -1,4 +1,252 @@
 ## 开发日志
+  + v_3.8.7
+    - 修复组合任务单个子任务失败后，重新恢复组合任务，组合任务状态变为完成的问题
+    - 修复40x错误，会继续重试并且无法重试成功的问题 https://github.com/AriaLyy/Aria/issues/619
+    - 修复wait模式下，resume(true)无效问题
+    - 修复now模式下的一些问题 https://github.com/AriaLyy/Aria/issues/620
+    - 修复组任务，其中一个子任务在获取文件长度失败后，重新恢复组合任务，组合任务状态变为完成的问题 https://github.com/AriaLyy/Aria/issues/628
+    - 修复组任务中，其中一个子任务是30x地址，导致调度器无法出现该子任务状态的问题
+    - 增加组任务groupHash冲突检查 https://github.com/AriaLyy/Aria/issues/635
+  + v_3.8.6 (2020/2/17)
+    - fix bug https://github.com/AriaLyy/Aria/issues/608
+    - fix bug https://github.com/AriaLyy/Aria/issues/579#issuecomment-586665035
+    - fix bug https://github.com/AriaLyy/Aria/issues/610
+    - fix bug https://github.com/AriaLyy/Aria/issues/614
+    - 增加文件名适配器（感谢小伙伴[DaveBoy](https://github.com/DaveBoy)的PR）
+    - 优化异常提示
+  + v_3.8.5 (2020/1/18)
+    - fix bug https://github.com/AriaLyy/Aria/issues/599
+    - 增加密钥url转换器的参数 https://github.com/AriaLyy/Aria/issues/603
+    - 增加sftp，文件上传、下载功能，[sftp下载](https://aria.laoyuyu.me/aria_doc/download/sftp_normal.html)，[sftp上传](https://aria.laoyuyu.me/aria_doc/upload/sftp_normal.html)
+    - 使用零拷贝技术，优化了合并分块的效率
+  + v_3.8.3 (2020/1/9)
+    - fix bug https://github.com/AriaLyy/Aria/issues/573
+    - android P适配 https://github.com/AriaLyy/Aria/issues/581
+    - 添加ftp服务器标志 https://github.com/AriaLyy/Aria/issues/580
+    - 重构loader模块，让loader模块的代码更加清晰，去除一些不必要的线程创建
+    - 修复ftp上传完成后，删除服务器端的文件，无法重新下载的问题
+    - 增加获取执行中的任务api，详情见：https://aria.laoyuyu.me/aria_doc/api/task_list.html
+    - 增加获取剩余时间的api，详情见：https://aria.laoyuyu.me/aria_doc/start/task_explain.html
+    - fix bug https://github.com/AriaLyy/Aria/issues/595
+  + v_3.8.1 (2019/12/22)
+    - 修复一个表创建失败的问题 https://github.com/AriaLyy/Aria/issues/570
+    - 修复一个非分块模式下导致下载失败的问题 https://github.com/AriaLyy/Aria/issues/571
+    - 修复一个服务器端无法创建socket连接，却没有返回码导致客户端卡住的问题 https://github.com/AriaLyy/Aria/issues/569
+    - 修复文件删除后，组合任务没有重新下载的问题 https://github.com/AriaLyy/Aria/issues/574
+    - 优化缓存队列和执行队列
+  + v_3.8 (2019/12/17)
+    - 移除androidx和support的依赖，现在无论是哪个版本的appcompat包都可以使用本框架
+    - 修复一个在xml中使用fragment导致的内存泄漏问题
+    - m3u8协议的key信息增加了`keyFormat`，`keyFormatVersion`字段
+    - m3u8增加了`ignoreFailureTs`方法，忽略下载失败的ts切片
+    - 修复在dialogFragment的`onCreateDialog()`注册导致的注解不生效问题
+    - 修复组合任务初始化失败时，无法删除的问题
+    - 修复`reStart()`后，无法停止的问题
+    - ftp增加主动模式，开启主动模式：https://aria.laoyuyu.me/aria_doc/api/ftp_params.html
+    - 修复ftp服务器无法响应`abor`命令导致的无法停止上传的问题 https://github.com/AriaLyy/Aria/issues/564
+    - 修复ftp上传时，服务器有长度为0的文件导致上传失败的问题
+    - 修复下载任务和上传任务的文件路径是同一个时，导致的记录混乱问题
+    - 优化提示
+  + v_3.7.10 (2019/12/3)
+    - fix bug https://github.com/AriaLyy/Aria/issues/543#issuecomment-559733124
+    - fix bug https://github.com/AriaLyy/Aria/issues/542
+    - fix bug https://github.com/AriaLyy/Azria/issues/547
+    - 修复下载失败时，中断重试无效的问题
+    - 增加忽略权限检查的api，`ignoreCheckPermissions()`
+    - 增加通用的的忽略文件路径被占用的api，`isIgnoreFilePathOccupy()`
+  + v_3.7.9 (2019/11/28)
+    - fix bug https://github.com/AriaLyy/Aria/issues/537
+  + v_3.7.8 (2019/11/28)
+    - fix bug https://github.com/AriaLyy/Aria/issues/526
+    - fix bug https://github.com/AriaLyy/Aria/issues/533
+    - fix bug https://github.com/AriaLyy/Aria/issues/535
+    - 修复ftp无法完成下载的问题
+    - 修复一个非分块模式下，调用`updateUrl(newUrl)`后无法恢复下载的问题
+    - 增加立即恢复任务的接口，正常来说，当执行队列满时，调用恢复任务接口，只能将任务放到缓存队列中。如果希望调用恢复接口，马上进入执行队列，需要调用`resume(true)`这个重载方法。
+    - 增加M3U8加密密钥的下载地址转换器 https://github.com/AriaLyy/Aria/issues/522
+  + v_3.7.7 (2019/11/20)
+    - 修复ftp无法完成下载的问题
+    - 修复一个http下载崩溃的问题
+  + v_3.7.6 (2019/11/19)
+    - fix bug https://github.com/AriaLyy/Aria/issues/505
+    - fix bug https://github.com/AriaLyy/Aria/issues/516
+    - fix bug https://github.com/AriaLyy/Aria/issues/515
+    - 增加强制上传的api`forceUpload()`
+    - 修复for循环上传文件出现的问题
+    - 移除创建任务的500ms间隔限制
+    - 修复多线程读写时可能出现的`database is locked`的问题
+  + v_3.7.5 (2019/11/10)
+    - fix bug https://github.com/AriaLyy/Aria/issues/500
+    - fix bug https://github.com/AriaLyy/Aria/issues/508
+    - fix bug https://github.com/AriaLyy/Aria/issues/503
+    - 修复m3u8创建索引不成功的问题
+  + v_3.7.4 (2019/11/2)
+    - 修复一个class被莫名改变的问题
+    - 修复非分块模式下导致的一个下载失败问题
+    - fix bug https://github.com/AriaLyy/Aria/issues/493
+  + v_3.7.3 (2019/10/31)
+    - fix bug https://github.com/AriaLyy/Aria/issues/495
+    - fix bug https://github.com/AriaLyy/Aria/issues/496
+  + v_3.7.2 (2019/10/28)
+    - fix bug https://github.com/AriaLyy/Aria/issues/450
+    - fix bug https://github.com/AriaLyy/Aria/issues/466
+    - fix bug https://github.com/AriaLyy/Aria/issues/454
+    - fix bug https://github.com/AriaLyy/Aria/issues/467
+    - fix bug https://github.com/AriaLyy/Aria/issues/459
+    - fix bug https://github.com/AriaLyy/Aria/issues/487
+    - fix bug https://github.com/AriaLyy/Aria/issues/483
+    - fix bug https://github.com/AriaLyy/Aria/issues/482
+    - fix bug https://github.com/AriaLyy/Aria/issues/473
+    - 移除隐藏api的反射 https://github.com/AriaLyy/Aria/issues/456
+    - 新增ftp免证书登陆功能 https://github.com/AriaLyy/Aria/issues/455
+    - 适配androidX
+    - 修复组合任务，恢复下载，会出现进度显示为0的问题
+    - m3u8点播下载新增创建ts索引功能
+    - 修复多任务的m3u8点播下载时，一个任务调用`jumpIndex`，其它m3u8任务也会自动调用`jumpIndex`的问题
+    - 添加权限检查
+  + v_3.6.6 (2019/8/7)
+    - fix bug https://github.com/AriaLyy/Aria/issues/426
+    - fix bug https://github.com/AriaLyy/Aria/issues/429
+    - fix bug https://github.com/AriaLyy/Aria/issues/428
+    - fix bug https://github.com/AriaLyy/Aria/issues/427
+    - fix bug https://github.com/AriaLyy/Aria/issues/431
+    - fix bug https://github.com/AriaLyy/Aria/issues/441
+    - 修复普通下载任务、组合任务共享执行队列、缓存池的问题
+    - 修复组合任务启动失败时，`DownloadGroupEntity`的状态变为执行中的问题
+  + v_3.6.5 (2019/7/17)
+    - fix bug https://github.com/AriaLyy/Aria/issues/403
+    - fix bug https://github.com/AriaLyy/Aria/issues/414
+    - fix bug https://github.com/AriaLyy/Aria/issues/406
+    - fix bug https://github.com/AriaLyy/Aria/issues/407
+    - fix bug https://github.com/AriaLyy/Aria/issues/416
+    - fix bug https://github.com/AriaLyy/Aria/issues/420
+    - fix bug https://github.com/AriaLyy/Aria/issues/422
+    - 新增ftp上传拦截器 https://github.com/AriaLyy/Aria/issues/402
+    - 重构线程任务模块
+    - 新增m3u8协议的文件下载
+    - 修复拦截器可能出现的空指针问题
+    - 移除`DownloadGroupEntity`字段`groupHash`的主键约束，`DownloadEntity`字段`groupHash`的外键约束，`TaskRecord`字段`dGroupHash`的外键约束
+    - 优化关联查询的性能
+    - 修复任务记录删除失败的问题
+    - 优化网络连接状态获取的逻辑
+    - 修复配置文件的某些配置失效的问题
+    - 新增m3u8切片状态注解`@M3U8.onPeerStart`，`@M3U8.onPeerComplete`，`@M3U8.onPeerFail`
+    - 新增动态指定m3u8协议视频的下载功能（边下边播下载支持）,[详情](https://aria.laoyuyu.me/aria_doc/download/m3u8_vod.html)
+    - 优化`unknownSize`的处理，https://github.com/AriaLyy/Aria/issues/419，需要注意，如果组合任务只任务数过多，将需要更多时间才能进入下载流程
+  + v_3.6.4 (2019/5/16)
+    - 优化任务接收器的代码结构
+    - 修复`DbEntity.saveAll()`失败的问题
+    - 修复分块任务重命名失败的问题
+    - fix bug https://github.com/AriaLyy/Aria/issues/379
+    - 移除`getDownloadTask(String url)`、`getGroupTask(List<String> urls)`、`getFtpDirTask(String path)`
+      等获取任务的api，如果你希望获取对应状态，请使用实体的状态判断，如：`getDownloadEntity()`、`getDownloadGroupEntity()`
+      `getFtpDirEntity()`
+    - fix bug https://github.com/AriaLyy/Aria/issues/388
+    - 修复使用`Content-Disposition`的文件名时，第一次下载无法重命名文件的问题
+    - 修复使用`Content-Disposition`的文件名时，多次重命名文件的问题
+    - 组合任务新增`unknownSize()`，用于处理组合任务大小ø未知的情况，https://github.com/AriaLyy/Aria/issues/380
+    - 优化`AbsThreadTask`代码
+    - 新增文件长度处理功能 https://github.com/AriaLyy/Aria/issues/393
+      ```java
+      .setFileLenAdapter(new IHttpFileLenAdapter() {
+        @Override public long handleFileLen(Map<String, List<String>> headers) {
+          ...
+          // 处理header中的文件长度
+
+          return fileLen;
+        }
+       })
+      ```
+    - 修复组合任务多次回调`onStop`注解的问题
+    - 优化`isRunning()`的逻辑，任务是否在执行的判断将更加准确
+    - 修复多次重复快速点击`暂停、开始`时，任务有可能重复下载的问题
+    - 修复组合任务中没有等待中的只任务实体保存失败的问题
+    - 新增组合任务url重复检查 https://github.com/AriaLyy/Aria/issues/395
+    - 初始化任务时，如果url、path有错误将会回调`@Download.onTaskFail`、`@Upload.onTaskFail`、`@DownGroup.onTaskFail`
+  + v_3.6.3 (2019/4/2)
+    - fix bug https://github.com/AriaLyy/Aria/issues/377
+  + v_3.6.2 (2019/4/1)
+    - fix bug https://github.com/AriaLyy/Aria/issues/368
+    - 增加gradle 5.0支持
+    - fix bug https://github.com/AriaLyy/Aria/issues/374
+    - 增加分页功能，详情见：https://aria.laoyuyu.me/aria_doc/api/task_list.html#%E4%BB%BB%E5%8A%A1%E5%88%97%E8%A1%A8%E5%88%86%E9%A1%B5%EF%BC%88362%E4%BB%A5%E4%B8%8A%E7%89%88%E6%9C%AC%E6%94%AF%E6%8C%81%EF%BC%89
+  + v_3.6.1 (2019/3/5)
+    - fix bug https://github.com/AriaLyy/Aria/issues/367
+  + v_3.6 (2019/2/27)
+    - 优化数据库写入\修改的速度
+    - 精减任务实体的存储
+    - 增加下载组合任务的配置
+    - useBroadcast\notNetRetry这两个配置，统一在AppConfig中配置
+    - fix bug https://github.com/AriaLyy/Aria/issues/361
+    - fix bug https://github.com/AriaLyy/Aria/issues/365
+  + v_3.5.4 (2019/1/8)
+    - 修复不支持断点的下载地址，重复下载出现的数据库主键冲突问题
+  + v_3.5.3 (2018/12/23)
+    - 修复ftps不能加载默认证书的bug https://github.com/AriaLyy/Aria/issues/334
+    - 优化注解性能，移除不必要的判断代码
+    - 增加广播支持，详情见:http://aria.laoyuyu.me/aria_doc/api/use_broadcast.html
+    - 增加get参数支持
+      ```java
+      Aria.download(SingleTaskActivity.this)
+              .load(DOWNLOAD_URL) // url 必须是主体url，也就是?前面的内容
+              .setFilePath(path, true)
+              .asGet()
+              .setParams(params) // 设置参数
+              .start();
+      ```
+      - fix bug https://github.com/AriaLyy/Aria/issues/335
+      - 新增进度百分比保存 https://github.com/AriaLyy/Aria/issues/336
+      - fix bug https://github.com/AriaLyy/Aria/issues/335
+  + v_3.5.2
+    - 添加Serializable接口支持 https://github.com/AriaLyy/Aria/issues/320
+    - 失败回调增加错误原因 https://github.com/AriaLyy/Aria/issues/310
+      ```
+      @Download.onTaskFail void taskFail(DownloadTask task, Exception e) {
+         e.getMessage();
+        ...
+      }
+      ```
+     - fix bug https://github.com/AriaLyy/Aria/issues/322
+     - 新增201 重定向支持 https://github.com/AriaLyy/Aria/issues/318
+     - 修复使用`useServerFileName(true)`中含有`"`导致的文件后缀名错误问题
+     - 优化logcat日志提示
+     - 修改下载线程的优先级为`Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);`
+     - fix bug https://github.com/AriaLyy/Aria/issues/319
+     - 修复分卡下载失败的问题 https://github.com/AriaLyy/Aria/issues/326
+     - 初始化Aria时会将所有数据库状态为下载中的任务改为已停止，防止应用被kill后，任务状态错误
+     - 初始化时自动判断文件是否被删除，文件被删除的任务将自动重置默认值
+     - 修复刷新url后，文件无法删除的 bug
+     - fix bug https://github.com/AriaLyy/Aria/issues/309
+     - 优化配置文件的读取
+  + v_3.5.1
+    - 优化`taskExists`方法
+    - 添加`post`参数请求支持
+      ```java
+      Aria.download(SingleTaskActivity.this)
+              .load(DOWNLOAD_URL)
+              .setFilePath(path)
+              .asPost() // post请求
+              .setParam("key", "value") //传递参数
+              //.setParams(Map<String, String>) // 传递多参数
+              .start();
+      ```
+     - 增加强制设置文件路径的api, https://github.com/AriaLyy/Aria/issues/311
+       ```java
+       Aria.download(SingleTaskActivity.this)
+                     .load(DOWNLOAD_URL)
+                     .setFilePath(path, true) // true表示忽略路径是否被占用
+                     .start();
+       ```
+  + v_3.5
+    - fix bug https://github.com/AriaLyy/Aria/issues/302
+    - fix bug https://github.com/AriaLyy/Aria/issues/283
+    - fix bug https://github.com/AriaLyy/Aria/issues/305
+    - fix bug https://github.com/AriaLyy/Aria/issues/306
+    - fix bug https://github.com/AriaLyy/Aria/issues/272  (现在，停止所有任务，未开始的任务状态将变为停止)
+    - fix bug https://github.com/AriaLyy/Aria/issues/277
+    - fix bug https://github.com/AriaLyy/Aria/issues/303
+    - 优化停止任务的速度
+    - 修复组合任务修改子任务文件名失败的问题
   + v_3.4.12
     - fix bug https://github.com/AriaLyy/Aria/issues/286
     - 优化线程池任务

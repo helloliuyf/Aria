@@ -1,14 +1,14 @@
 apply plugin: 'com.android.library'
 
 android {
-  compileSdkVersion 23
-  buildToolsVersion '26.0.2'
+  compileSdkVersion rootProject.ext.compileSdkVersion
+  buildToolsVersion rootProject.ext.buildToolsVersion
 
   defaultConfig {
-    minSdkVersion 9
-    targetSdkVersion 23
-    versionCode 329
-    versionName "3.2.9"
+    minSdkVersion rootProject.ext.minSdkVersion
+    targetSdkVersion rootProject.ext.targetSdkVersion
+    versionCode rootProject.ext.versionCode
+    versionName rootProject.ext.versionName
   }
   buildTypes {
     release {
@@ -20,14 +20,13 @@ android {
     abortOnError false
   }
 }
-
 dependencies {
-  compile fileTree(include: ['*.jar'], dir: 'libs')
-  testCompile 'junit:junit:4.12'
-  compile 'com.android.support:appcompat-v7:23.1.1'
-  compile project(':AriaAnnotations')
-  compile 'com.arialyy.aria:aria-ftp-plug:1.0.3'
-
-//    compile project(':AriaFtpPlug')
+  implementation fileTree(include: ['*.jar'], dir: 'libs')
+  testImplementation 'junit:junit:4.12'
+//  implementation "androidx.appcompat:appcompat:${rootProject.ext.XAppcompatVersion}"
+  api project(':AriaAnnotations')
+  api project(path: ':PublicComponent')
+  api project(path: ':HttpComponent')
 }
+
 apply from: 'bintray-release.gradle'

@@ -16,11 +16,10 @@
 
 package com.arialyy.simple.base;
 
-import android.databinding.ViewDataBinding;
 import android.os.Bundle;
-import android.support.v7.widget.Toolbar;
 import android.view.MenuItem;
-import butterknife.Bind;
+import androidx.appcompat.widget.Toolbar;
+import androidx.databinding.ViewDataBinding;
 import com.arialyy.frame.core.AbsActivity;
 import com.arialyy.frame.util.AndroidVersionUtil;
 import com.arialyy.simple.R;
@@ -32,7 +31,7 @@ import com.arialyy.simple.common.MsgDialog;
 public abstract class BaseActivity<VB extends ViewDataBinding> extends AbsActivity<VB>
     implements Toolbar.OnMenuItemClickListener {
 
-  @Bind(R.id.toolbar) protected Toolbar mBar;
+  protected Toolbar mBar;
 
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -43,16 +42,22 @@ public abstract class BaseActivity<VB extends ViewDataBinding> extends AbsActivi
 
   @Override protected void init(Bundle savedInstanceState) {
     super.init(savedInstanceState);
-    setSupportActionBar(mBar);
-    getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-    mBar.setOnMenuItemClickListener(this);
+    mBar = findViewById(R.id.toolbar);
+    if (mBar != null) {
+      setSupportActionBar(mBar);
+      getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+      mBar.setOnMenuItemClickListener(this);
+    }
   }
 
-  protected void setTile(String title){
+  protected void setTile(String title) {
+    if (mBar == null) {
+      mBar = findViewById(R.id.toolbar);
+    }
     mBar.setTitle(title);
   }
 
-  protected void showMsgDialog(String title, String msg){
+  protected void showMsgDialog(String title, String msg) {
     MsgDialog dialog = new MsgDialog(this, title, msg);
     dialog.show(getSupportFragmentManager(), "msg_dialog");
   }

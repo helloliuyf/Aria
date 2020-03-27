@@ -16,9 +16,11 @@
 package com.arialyy.compiler;
 
 import com.arialyy.annotations.Download;
+import com.arialyy.annotations.DownloadGroup;
+import com.arialyy.annotations.M3U8;
+import com.arialyy.annotations.TaskEnum;
 import com.arialyy.annotations.Upload;
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
@@ -27,20 +29,17 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.Modifier;
 
 /**
- * Created by lyy on 2017/9/6.
- * 任务事件代理文件
+ * Created by lyy on 2017/9/6. 任务事件代理文件
  *
  * <pre>
  *   <code>
- * package com.arialyy.simple.download;
+ * package com.arialyy.simple.core.download;
  *
  * import com.arialyy.aria.core.download.DownloadTask;
  * import com.arialyy.aria.core.scheduler.AbsSchedulerListener;
@@ -87,58 +86,96 @@ final class EventProxyFiler {
   }
 
   /**
-   * 创建代理方法
+   * 创建M3u8切片的代理方法
+   *
+   * @param taskEnum 任务类型枚举{@link TaskEnum}
+   * @param annotation {@link Download}、{@link Upload}、{@link M3U8}
+   * @param methodInfo 被代理类注解的方法信息
+   */
+  private MethodSpec createM3U8PeerMethod(TaskEnum taskEnum, Class<? extends Annotation> annotation,
+      MethodInfo methodInfo) {
+
+    String sb = String.format("obj.%s(m3u8Url, peerPath, peerIndex);\n", methodInfo.methodName);
+
+    MethodSpec.Builder builder = MethodSpec.methodBuilder(annotation.getSimpleName())
+        .addModifiers(Modifier.PUBLIC)
+        .returns(void.class)
+        .addParameter(String.class, "m3u8Url", Modifier.FINAL)
+        .addParameter(String.class, "peerPath", Modifier.FINAL)
+        .addParameter(int.class, "peerIndex", Modifier.FINAL)
+        .addAnnotation(Override.class)
+        .addCode(sb);
+
+    return builder.build();
+  }
+
+  /**
+   * 创建任务的代理方法
    *
    * @param taskEnum 任务类型枚举{@link TaskEnum}
    * @param annotation {@link Download}、{@link Upload}
-   * @param methodName 被代理类注解的方法名
+   * @param methodInfo 被代理类注解的方法信息
    */
-  private MethodSpec createProxyMethod(TaskEnum taskEnum, Class<? extends Annotation> annotation,
-      String methodName) {
-    ClassName task = ClassName.get(taskEnum.getPkg(), taskEnum.getClassName());
+  private MethodSpec createTaskMethod(TaskEnum taskEnum, Class<? extends Annotation> annotation,
+      MethodInfo methodInfo) {
+    ClassName task = ClassName.get(taskEnum.pkg, taskEnum.className);
+
+    String callCode;
+
+    if (taskEnum == TaskEnum.DOWNLOAD_GROUP_SUB) {
+      if (methodInfo.params.get(methodInfo.params.size() - 1)
+          .asType()
+          .toString()
+          .equals(Exception.class.getName())
+          && annotation == DownloadGroup.onSubTaskFail.class) {
+        callCode = "task, subEntity, e";
+      } else {
+        callCode = "task, subEntity";
+      }
+    } else {
+      if (methodInfo.params.get(methodInfo.params.size() - 1)
+          .asType()
+          .toString()
+          .equals(Exception.class.getName())
+          && (annotation == Download.onTaskFail.class
+          || annotation == Upload.onTaskFail.class
+          || annotation == DownloadGroup.onTaskFail.class)) {
+        callCode = "task, e";
+      } else {
+        callCode = "task";
+      }
+    }
+
+    String sb = String.format("obj.%s((%s)%s);\n",
+        methodInfo.methodName, taskEnum.className, callCode);
 
     ParameterSpec taskParam =
         ParameterSpec.builder(task, "task").addModifiers(Modifier.FINAL).build();
-
-    String callCode;
-    if (taskEnum == TaskEnum.DOWNLOAD_GROUP_SUB) {
-      callCode = "task, subEntity";
-    } else {
-      callCode = "task";
-    }
-    StringBuilder sb = new StringBuilder();
-    sb.append("Set<String> keys = keyMapping.get(\"").append(methodName).append("\");\n");
-    sb.append("if (keys != null) {\n\tif (keys.contains(task.getKey())) {\n")
-        .append("\t\tobj.")
-        .append(methodName)
-        .append("((")
-        .append(taskEnum.getClassName())
-        .append(")")
-        .append(callCode)
-        .append(");\n\t}\n} else {\n")
-        .append("\tobj.")
-        .append(methodName)
-        .append("((")
-        .append(taskEnum.getClassName())
-        .append(")")
-        .append(callCode)
-        .append(");\n}\n");
-
     MethodSpec.Builder builder = MethodSpec.methodBuilder(annotation.getSimpleName())
         .addModifiers(Modifier.PUBLIC)
         .returns(void.class)
         .addParameter(taskParam)
         .addAnnotation(Override.class)
-        .addCode(sb.toString());
+        .addCode(sb);
 
     //任务组接口
     if (taskEnum == TaskEnum.DOWNLOAD_GROUP_SUB) {
-      ClassName subTask = ClassName.get(TaskEnum.DOWNLOAD_ENTITY.pkg, TaskEnum.DOWNLOAD_ENTITY.className);
+      ClassName subTask =
+          ClassName.get(EntityInfo.DOWNLOAD.pkg, EntityInfo.DOWNLOAD.className);
       ParameterSpec subTaskParam =
           ParameterSpec.builder(subTask, "subEntity").addModifiers(Modifier.FINAL).build();
 
       builder.addParameter(subTaskParam);
     }
+
+    if (annotation == Download.onTaskFail.class
+        || annotation == Upload.onTaskFail.class
+        || annotation == DownloadGroup.onTaskFail.class
+        || annotation == DownloadGroup.onSubTaskFail.class) {
+      ParameterSpec exception = ParameterSpec.builder(Exception.class, "e").build();
+      builder.addParameter(exception);
+    }
+
     return builder.build();
   }
 
@@ -154,43 +191,26 @@ final class EventProxyFiler {
     FieldSpec observerField = FieldSpec.builder(obj, "obj").addModifiers(Modifier.PRIVATE).build();
     builder.addField(observerField);
 
-    //添加url映射表
-    FieldSpec mappingField = FieldSpec.builder(
-        ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(String.class),
-            ParameterizedTypeName.get(ClassName.get(Set.class), ClassName.get(String.class))),
-        "keyMapping").addModifiers(Modifier.PRIVATE).initializer("new $T()", HashMap.class).build();
-    builder.addField(mappingField);
-
     //添加注解方法
     for (TaskEnum te : entity.methods.keySet()) {
-      Map<Class<? extends Annotation>, String> temp = entity.methods.get(te);
-      if (temp != null) {
-        for (Class<? extends Annotation> annotation : temp.keySet()) {
-          MethodSpec method = createProxyMethod(te, annotation, temp.get(annotation));
-          builder.addMethod(method);
+      Map<Class<? extends Annotation>, MethodInfo> methodInfoMap = entity.methods.get(te);
+      if (methodInfoMap != null) {
+        for (Class<? extends Annotation> annotation : methodInfoMap.keySet()) {
+          if (te == TaskEnum.DOWNLOAD
+              || te == TaskEnum.DOWNLOAD_GROUP
+              || te == TaskEnum.DOWNLOAD_GROUP_SUB
+              || te == TaskEnum.UPLOAD) {
+            MethodSpec method = createTaskMethod(te, annotation, methodInfoMap.get(annotation));
+            builder.addMethod(method);
+          } else if (te == TaskEnum.M3U8_PEER) {
+            MethodSpec method = createM3U8PeerMethod(te, annotation, methodInfoMap.get(annotation));
+            builder.addMethod(method);
+          }
         }
       }
     }
 
-    //增加构造函数
-    CodeBlock.Builder cb = CodeBlock.builder();
-    cb.add("Set<String> set = null;\n");
-    for (String methodName : entity.keyMappings.keySet()) {
-      //PrintLog.getInstance().info("methodName ====> " +  methodName);
-      Set<String> keys = entity.keyMappings.get(methodName);
-      if (keys == null || keys.size() == 0) continue;
-      StringBuilder sb = new StringBuilder();
-      sb.append("set = new $T();\n");
-      for (String key : keys) {
-        if (key.isEmpty()) continue;
-        sb.append("set.add(\"").append(key).append("\");\n");
-      }
-
-      sb.append("keyMapping.put(\"").append(methodName).append("\", ").append("set);\n");
-      cb.add(sb.toString(), ClassName.get(HashSet.class));
-    }
-    MethodSpec structure =
-        MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC).addCode(cb.build()).build();
+    MethodSpec structure = MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC).build();
     builder.addMethod(structure);
 
     //添加设置代理的类
@@ -206,16 +226,29 @@ final class EventProxyFiler {
     builder.addJavadoc("该文件为Aria自动生成的代理文件，请不要修改该文件的任何代码！\n");
 
     //创建父类参数
-    ClassName superClass = ClassName.get("com.arialyy.aria.core.scheduler", "AbsSchedulerListener");
-    //主任务泛型参数
-    ClassName taskTypeVariable =
-        ClassName.get(entity.mainTaskEnum.pkg, entity.mainTaskEnum.className);
-    //子任务泛型参数
-    ClassName subTaskTypeVariable =
-        ClassName.get(entity.subTaskEnum.pkg, entity.subTaskEnum.className);
+    ClassName superClass =
+        ClassName.get("com.arialyy.aria.core.scheduler", entity.mainTaskEnum.proxySuperClass);
 
-    builder.superclass(
-        ParameterizedTypeName.get(superClass, taskTypeVariable, subTaskTypeVariable));
+    if (entity.mainTaskEnum == TaskEnum.DOWNLOAD
+        || entity.mainTaskEnum == TaskEnum.UPLOAD
+        || entity.mainTaskEnum == TaskEnum.DOWNLOAD_GROUP) {
+      ClassName taskTypeVariable =
+          ClassName.get(entity.mainTaskEnum.pkg, entity.mainTaskEnum.className);
+      builder.superclass(ParameterizedTypeName.get(superClass, taskTypeVariable));
+    } else if (entity.mainTaskEnum == TaskEnum.DOWNLOAD_GROUP_SUB) {
+
+      ClassName taskTypeVariable =
+          ClassName.get(entity.mainTaskEnum.pkg, entity.mainTaskEnum.className);
+      //子任务泛型参数
+      ClassName subTaskTypeVariable =
+          ClassName.get(entity.subTaskEnum.pkg, entity.subTaskEnum.className);
+
+      builder.superclass(
+          ParameterizedTypeName.get(superClass, taskTypeVariable, subTaskTypeVariable));
+    } else if (entity.mainTaskEnum == TaskEnum.M3U8_PEER) {
+      builder.superclass(superClass);
+    }
+
     builder.addMethod(listener);
     return builder.build();
   }

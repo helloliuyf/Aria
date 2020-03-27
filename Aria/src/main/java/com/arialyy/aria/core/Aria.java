@@ -23,8 +23,6 @@ import android.app.Dialog;
 import android.app.Service;
 import android.content.Context;
 import android.os.Build;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.app.Fragment;
 import android.widget.PopupWindow;
 import com.arialyy.aria.core.download.DownloadReceiver;
 import com.arialyy.aria.core.upload.UploadReceiver;
@@ -43,15 +41,15 @@ import com.arialyy.aria.util.ALog;
  *       .load(URL)     //下载地址，必填
  *       //文件保存路径，必填
  *       .setDownloadPath(Environment.getExternalStorageDirectory().getPath() + "/test.apk")
- *       .start();
+ *       .create();
  *   </code>
  *   <code>
  *    //上传
  *    Aria.upload(this)
  *        .load(filePath)     //文件路径，必填
- *        .setUploadUrl(uploadUrl)  //上传路径，必填
+ *        .setTempUrl(uploadUrl)  //上传路径，必填
  *        .setAttachment(fileKey)   //服务器读取文件的key，必填
- *        .start();
+ *        .create();
  *   </code>
  * </pre>
  *
@@ -67,7 +65,7 @@ import com.arialyy.aria.util.ALog;
  *       .load(URL)     //下载地址，必填
  *       //文件保存路径，必填
  *       .setDownloadPath(Environment.getExternalStorageDirectory().getPath() + "/test.apk")
- *       .start();
+ *       .create();
  *
  *   </code>
  *
@@ -86,8 +84,8 @@ import com.arialyy.aria.util.ALog;
    * @param obj 观察者对象，为本类对象，使用{@code this}
    */
   public static DownloadReceiver download(Object obj) {
-    if (AriaManager.getInstance() != null){
-     return AriaManager.getInstance().download(obj);
+    if (AriaManager.getInstance() != null) {
+      return AriaManager.getInstance().download(obj);
     }
     return get(convertContext(obj)).download(obj);
   }
@@ -100,7 +98,7 @@ import com.arialyy.aria.util.ALog;
    * @param obj 观察者对象，为本类对象，使用{@code this}
    */
   public static UploadReceiver upload(Object obj) {
-    if (AriaManager.getInstance() != null){
+    if (AriaManager.getInstance() != null) {
       return AriaManager.getInstance().upload(obj);
     }
     return get(convertContext(obj)).upload(obj);
@@ -111,11 +109,12 @@ import com.arialyy.aria.util.ALog;
    */
   public static AriaManager get(Context context) {
     if (context == null) {
-      throw new NullPointerException("context 无效，在非【Activity、Service、Application、DialogFragment、Fragment、PopupWindow、Dialog】，"
-          + "请参考【https://aria.laoyuyu.me/aria_doc/start/any_java.html】，参数请使用 download(this) 或 upload(this);"
-          + "不要使用 download(getContext()) 或 upload(getContext())");
+      throw new NullPointerException(
+          "context 无效，在非【Activity、Service、Application、DialogFragment、Fragment、PopupWindow、Dialog】，"
+              + "请参考【https://aria.laoyuyu.me/aria_doc/create/any_java.html】，参数请使用 download(this) 或 upload(this);"
+              + "不要使用 download(getContext()) 或 upload(getContext())");
     }
-    return AriaManager.getInstance(context);
+    return AriaManager.init(context);
   }
 
   /**
@@ -125,7 +124,7 @@ import com.arialyy.aria.util.ALog;
    * {@link #download(Object)}、{@link #upload(Object)}
    */
   public static AriaManager init(Context context) {
-    return AriaManager.getInstance(context);
+    return get(context);
   }
 
   private static Context convertContext(Object obj) {
@@ -135,14 +134,8 @@ import com.arialyy.aria.util.ALog;
       return (Service) obj;
     } else if (obj instanceof Activity) {
       return (Activity) obj;
-    } else if (obj instanceof DialogFragment) {
-      return ((DialogFragment) obj).getContext();
-    } else if (obj instanceof android.app.DialogFragment) {
-      return ((android.app.DialogFragment) obj).getActivity();
-    } else if (obj instanceof android.support.v4.app.Fragment) {
-      return ((Fragment) obj).getContext();
-    } else if (obj instanceof android.app.Fragment) {
-      return ((android.app.Fragment) obj).getActivity();
+    } else if (AriaManager.isFragment(obj.getClass())) {
+      return AriaManager.getFragmentActivity(obj);
     } else if (obj instanceof Dialog) {
       return ((Dialog) obj).getContext();
     } else if (obj instanceof PopupWindow) {

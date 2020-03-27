@@ -16,11 +16,11 @@
 package com.arialyy.aria.core.manager;
 
 import android.text.TextUtils;
-import com.arialyy.aria.core.AriaManager;
-import com.arialyy.aria.core.command.group.GroupCmdFactory;
-import com.arialyy.aria.core.inf.AbsGroupTaskEntity;
+import com.arialyy.aria.core.command.GroupCmdFactory;
+import com.arialyy.aria.core.download.DGTaskWrapper;
+import com.arialyy.aria.core.event.EventMsgUtil;
 import com.arialyy.aria.util.ALog;
-import com.arialyy.aria.util.CommonUtil;
+import com.arialyy.aria.core.command.CmdHelper;
 import java.util.List;
 
 /**
@@ -29,11 +29,9 @@ import java.util.List;
  */
 public class SubTaskManager {
   private String TAG = "SubTaskManager";
-  private AbsGroupTaskEntity mEntity;
-  private String mTargetName;
+  private DGTaskWrapper mEntity;
 
-  public SubTaskManager(String targetName, AbsGroupTaskEntity entity) {
-    mTargetName = targetName;
+  public SubTaskManager(DGTaskWrapper entity) {
     mEntity = entity;
   }
 
@@ -44,10 +42,8 @@ public class SubTaskManager {
    */
   public void startSubTask(String url) {
     if (checkUrl(url)) {
-      AriaManager.getInstance(AriaManager.APP)
-          .setCmd(
-              CommonUtil.createGroupCmd(mTargetName, mEntity, GroupCmdFactory.SUB_TASK_START, url))
-          .exe();
+      EventMsgUtil.getDefault().post(
+          CmdHelper.createGroupCmd(mEntity, GroupCmdFactory.SUB_TASK_START, url));
     }
   }
 
@@ -58,24 +54,8 @@ public class SubTaskManager {
    */
   public void stopSubTask(String url) {
     if (checkUrl(url)) {
-      AriaManager.getInstance(AriaManager.APP)
-          .setCmd(
-              CommonUtil.createGroupCmd(mTargetName, mEntity, GroupCmdFactory.SUB_TASK_STOP, url))
-          .exe();
-    }
-  }
-
-  /**
-   * 删除子任务组中的子任务
-   *
-   * @param url 子任务下载地址
-   */
-  public void cancelSubTask(String url) {
-    if (checkUrl(url)) {
-      AriaManager.getInstance(AriaManager.APP)
-          .setCmd(
-              CommonUtil.createGroupCmd(mTargetName, mEntity, GroupCmdFactory.SUB_TASK_CANCEL, url))
-          .exe();
+      EventMsgUtil.getDefault().post(
+          CmdHelper.createGroupCmd(mEntity, GroupCmdFactory.SUB_TASK_STOP, url));
     }
   }
 

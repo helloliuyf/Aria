@@ -15,13 +15,8 @@
  */
 package com.arialyy.aria.core.common;
 
-import android.os.Build;
-import com.arialyy.aria.core.AriaManager;
-import com.arialyy.aria.util.CommonUtil;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import com.arialyy.annotations.TaskEnum;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,58 +34,32 @@ public class ProxyHelper {
    * 组合下载任务类型
    */
   public static int PROXY_TYPE_DOWNLOAD_GROUP = 0x02;
-  ///**
-  // * 组合任务子任务类型
-  // */
-  //public static int PROXY_TYPE_DOWNLOAD_GROUP_SUB = 0x03;
   /**
    * 普通上传任务类型
    */
-  public static int PROXY_TYPE_UPLOAD = 0x04;
-  public Set<String> downloadCounter = new HashSet<>(), uploadCounter = new HashSet<>(),
-      downloadGroupCounter = new HashSet<>(), downloadGroupSubCounter = new HashSet<>();
+  public static int PROXY_TYPE_UPLOAD = 0x03;
+  /**
+   * m3u8 peer
+   */
+  public static int PROXY_TYPE_M3U8_PEER = 0x04;
+  /**
+   * 组合任务子任务类型
+   */
+  public static int PROXY_TYPE_DOWNLOAD_GROUP_SUB = 0x05;
   public Map<String, Set<Integer>> mProxyCache = new ConcurrentHashMap<>();
 
   public static volatile ProxyHelper INSTANCE = null;
-  private boolean canLoadClass = false;
 
   private ProxyHelper() {
-    //init();
   }
 
   public static ProxyHelper getInstance() {
     if (INSTANCE == null) {
-      synchronized (AriaManager.LOCK) {
+      synchronized (ProxyHelper.class) {
         INSTANCE = new ProxyHelper();
       }
     }
     return INSTANCE;
-  }
-
-  /**
-   * @since 3.4.6 版本开始，已经在ElementHandler中关闭了ProxyClassCounter对象的生成
-   */
-  @Deprecated
-  private void init() {
-    List<String> classes = CommonUtil.getPkgClassNames(AriaManager.APP,
-        "com.arialyy.aria.ProxyClassCounter");
-    canLoadClass = classes != null
-        && !classes.isEmpty()
-        && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
-    if (canLoadClass) {
-      for (String className : classes) {
-        count(className);
-      }
-    }
-  }
-
-  /**
-   * 是否能读取到代理计数文件
-   *
-   * @return {@code true} 可以读取，{@code false} 不能读取
-   */
-  public boolean isCanLoadCountClass() {
-    return canLoadClass;
   }
 
   /**
@@ -106,27 +75,23 @@ public class ProxyHelper {
       return result;
     }
     result = new HashSet<>();
-    try {
-      if (Class.forName(className.concat("$$DownloadGroupListenerProxy")) != null) {
-        result.add(PROXY_TYPE_DOWNLOAD_GROUP);
-      }
-    } catch (ClassNotFoundException e) {
-      //e.printStackTrace();
+    if (checkProxyExist(className, TaskEnum.DOWNLOAD_GROUP.proxySuffix)) {
+      result.add(PROXY_TYPE_DOWNLOAD_GROUP);
     }
-    try {
-      if (Class.forName(className.concat("$$DownloadListenerProxy")) != null) {
-        result.add(PROXY_TYPE_DOWNLOAD);
-      }
-    } catch (ClassNotFoundException e) {
-      //e.printStackTrace();
+    if (checkProxyExist(className, TaskEnum.DOWNLOAD.proxySuffix)) {
+      result.add(PROXY_TYPE_DOWNLOAD);
     }
 
-    try {
-      if (Class.forName(className.concat("$$UploadListenerProxy")) != null) {
-        result.add(PROXY_TYPE_UPLOAD);
-      }
-    } catch (ClassNotFoundException e) {
-      //e.printStackTrace();
+    if (checkProxyExist(className, TaskEnum.UPLOAD.proxySuffix)) {
+      result.add(PROXY_TYPE_UPLOAD);
+    }
+
+    if (checkProxyExist(className, TaskEnum.M3U8_PEER.proxySuffix)) {
+      result.add(PROXY_TYPE_M3U8_PEER);
+    }
+
+    if (checkProxyExist(className, TaskEnum.DOWNLOAD_GROUP_SUB.proxySuffix)) {
+      result.add(PROXY_TYPE_DOWNLOAD_GROUP_SUB);
     }
 
     if (!result.isEmpty()) {
@@ -135,41 +100,19 @@ public class ProxyHelper {
     return result;
   }
 
-  @Deprecated
-  private void count(String className) {
+  private boolean checkProxyExist(String className, String proxySuffix) {
+    String clsName = className.concat(proxySuffix);
+
     try {
-      Class clazz = Class.forName(className);
-      Method download = clazz.getMethod("getDownloadCounter");
-      Method downloadGroup = clazz.getMethod("getDownloadGroupCounter");
-      Method downloadGroupSub = clazz.getMethod("getDownloadGroupSubCounter");
-      Method upload = clazz.getMethod("getUploadCounter");
-      Object object = clazz.newInstance();
-      Object dc = download.invoke(object);
-      if (dc != null) {
-        downloadCounter.addAll((Set<String>) dc);
+      if (getClass().getClassLoader().loadClass(clsName) != null) {
+        return true;
       }
-      Object dgc = downloadGroup.invoke(object);
-      if (dgc != null) {
-        downloadGroupCounter.addAll((Set<String>) dgc);
-      }
-      Object dgsc = downloadGroupSub.invoke(object);
-      if (dgsc != null) {
-        downloadGroupSubCounter.addAll((Set<String>) dgsc);
-      }
-      Object uc = upload.invoke(object);
-      if (uc != null) {
-        uploadCounter.addAll((Set<String>) uc);
+      if (Class.forName(clsName) != null) {
+        return true;
       }
     } catch (ClassNotFoundException e) {
-      e.printStackTrace();
-    } catch (InstantiationException e) {
-      e.printStackTrace();
-    } catch (IllegalAccessException e) {
-      e.printStackTrace();
-    } catch (NoSuchMethodException e) {
-      e.printStackTrace();
-    } catch (InvocationTargetException e) {
-      e.printStackTrace();
+      //e.printStackTrace();
     }
+    return false;
   }
 }

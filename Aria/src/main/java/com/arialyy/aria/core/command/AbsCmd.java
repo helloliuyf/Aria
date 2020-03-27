@@ -16,15 +16,15 @@
 
 package com.arialyy.aria.core.command;
 
-import com.arialyy.aria.core.inf.AbsTaskEntity;
-import com.arialyy.aria.core.queue.ITaskQueue;
+import com.arialyy.aria.core.wrapper.AbsTaskWrapper;
+import com.arialyy.aria.core.queue.AbsTaskQueue;
 
 /**
  * Created by AriaL on 2017/6/29.
  */
-public abstract class AbsCmd<T extends AbsTaskEntity> implements ICmd {
-  protected ITaskQueue mQueue;
-  protected T mTaskEntity;
+public abstract class AbsCmd<T extends AbsTaskWrapper> implements ICmd {
+  protected AbsTaskQueue mQueue;
+  protected T mTaskWrapper;
   protected String TAG;
 
   /**

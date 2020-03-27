@@ -18,29 +18,26 @@ package com.arialyy.aria.core.queue.pool;
 
 import android.text.TextUtils;
 import com.arialyy.aria.core.AriaManager;
-import com.arialyy.aria.core.inf.AbsTask;
+import com.arialyy.aria.core.task.AbsTask;
 import com.arialyy.aria.util.ALog;
 import com.arialyy.aria.util.CommonUtil;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.concurrent.LinkedBlockingDeque;
 
 /**
- * Created by lyy on 2016/8/15.
- * 任务执行池，所有当前下载任务都该任务池中，默认下载大小为2
+ * Created by lyy on 2016/8/15. 任务执行池，所有当前下载任务都该任务池中，默认下载大小为2
  */
 public class BaseExecutePool<TASK extends AbsTask> implements IPool<TASK> {
-  private final String TAG = "BaseExecutePool";
-  final long TIME_OUT = 1000;
-  ArrayBlockingQueue<TASK> mExecuteQueue;
-  Map<String, TASK> mExecuteMap;
+  private final String TAG = CommonUtil.getClassName(this);
+  private static final Object LOCK = new Object();
+  Deque<TASK> mExecuteQueue;
   int mSize;
 
   BaseExecutePool() {
     mSize = getMaxSize();
-    mExecuteQueue = new ArrayBlockingQueue<>(mSize);
-    mExecuteMap = new ConcurrentHashMap<>();
+    mExecuteQueue = new LinkedBlockingDeque<>(mSize);
   }
 
   /**
@@ -55,12 +52,12 @@ public class BaseExecutePool<TASK extends AbsTask> implements IPool<TASK> {
   /**
    * 获取所有正在执行的任务
    */
-  public Map<String, TASK> getAllTask() {
-    return mExecuteMap;
+  public List<TASK> getAllTask() {
+    return new ArrayList<>(mExecuteQueue);
   }
 
   @Override public boolean putTask(TASK task) {
-    synchronized (AriaManager.LOCK) {
+    synchronized (LOCK) {
       if (task == null) {
         ALog.e(TAG, "任务不能为空！！");
         return false;
@@ -87,18 +84,14 @@ public class BaseExecutePool<TASK extends AbsTask> implements IPool<TASK> {
    * @param maxNum 下载数
    */
   public void setMaxNum(int maxNum) {
-    synchronized (AriaManager.LOCK) {
-      try {
-        ArrayBlockingQueue<TASK> temp = new ArrayBlockingQueue<>(maxNum);
-        TASK task;
-        while ((task = mExecuteQueue.poll(TIME_OUT, TimeUnit.MICROSECONDS)) != null) {
-          temp.offer(task);
-        }
-        mExecuteQueue = temp;
-        mSize = maxNum;
-      } catch (InterruptedException e) {
-        e.printStackTrace();
+    synchronized (LOCK) {
+      Deque<TASK> temp = new LinkedBlockingDeque<>(maxNum);
+      TASK task;
+      while ((task = mExecuteQueue.poll()) != null) {
+        temp.offer(task);
       }
+      mExecuteQueue = temp;
+      mSize = maxNum;
     }
   }
 
@@ -108,13 +101,9 @@ public class BaseExecutePool<TASK extends AbsTask> implements IPool<TASK> {
    * @param newTask 新任务
    */
   boolean putNewTask(TASK newTask) {
-    synchronized (AriaManager.LOCK) {
-      String url = newTask.getKey();
+    synchronized (LOCK) {
       boolean s = mExecuteQueue.offer(newTask);
       ALog.d(TAG, "任务【" + newTask.getTaskName() + "】进入执行队列" + (s ? "成功" : "失败"));
-      if (s) {
-        mExecuteMap.put(CommonUtil.keyToHashKey(url), newTask);
-      }
       return s;
     }
   }
@@ -123,53 +112,45 @@ public class BaseExecutePool<TASK extends AbsTask> implements IPool<TASK> {
    * 队列满时，将移除下载队列中的第一个任务
    */
   boolean pollFirstTask() {
-    synchronized (AriaManager.LOCK) {
-      try {
-        TASK oldTask = mExecuteQueue.poll(TIME_OUT, TimeUnit.MICROSECONDS);
-        if (oldTask == null) {
-          ALog.w(TAG, "移除任务失败，原因：任务为null");
-          return false;
-        }
-        oldTask.stop();
-        String key = CommonUtil.keyToHashKey(oldTask.getKey());
-        mExecuteMap.remove(key);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
+    synchronized (LOCK) {
+      TASK oldTask = mExecuteQueue.pollFirst();
+      if (oldTask == null) {
+        ALog.w(TAG, "移除任务失败，原因：任务为null");
         return false;
       }
+      oldTask.stop();
       return true;
     }
   }
 
   @Override public TASK pollTask() {
-    synchronized (AriaManager.LOCK) {
-      try {
-        TASK task;
-        task = mExecuteQueue.poll(TIME_OUT, TimeUnit.MICROSECONDS);
-        if (task != null) {
-          String url = task.getKey();
-          mExecuteMap.remove(CommonUtil.keyToHashKey(url));
-        }
-        return task;
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-      return null;
+    synchronized (LOCK) {
+      return mExecuteQueue.poll();
     }
   }
 
   @Override public TASK getTask(String key) {
-    synchronized (AriaManager.LOCK) {
+    synchronized (LOCK) {
       if (TextUtils.isEmpty(key)) {
-        ALog.e(TAG, "key 为null");
+        ALog.e(TAG, "key为null");
         return null;
       }
-      return mExecuteMap.get(CommonUtil.keyToHashKey(key));
+      for (TASK task : mExecuteQueue) {
+        if (task.getKey().equals(key)) {
+          return task;
+        }
+      }
+
+      return null;
     }
   }
 
+  @Override public boolean taskExits(String key) {
+    return getTask(key) != null;
+  }
+
   @Override public boolean removeTask(TASK task) {
-    synchronized (AriaManager.LOCK) {
+    synchronized (LOCK) {
       if (task == null) {
         ALog.e(TAG, "任务不能为空");
         return false;
@@ -180,21 +161,13 @@ public class BaseExecutePool<TASK extends AbsTask> implements IPool<TASK> {
   }
 
   @Override public boolean removeTask(String key) {
-    synchronized (AriaManager.LOCK) {
+    synchronized (LOCK) {
       if (TextUtils.isEmpty(key)) {
         ALog.e(TAG, "key 为null");
         return false;
       }
-      String convertKey = CommonUtil.keyToHashKey(key);
-      TASK task = mExecuteMap.get(convertKey);
-      final int oldQueueSize = mExecuteQueue.size();
-      boolean isSuccess = mExecuteQueue.remove(task);
-      final int newQueueSize = mExecuteQueue.size();
-      if (isSuccess && newQueueSize != oldQueueSize) {
-        mExecuteMap.remove(convertKey);
-        return true;
-      }
-      return false;
+
+      return mExecuteQueue.remove(getTask(key));
     }
   }
 
